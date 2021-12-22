@@ -1,29 +1,27 @@
 #include <ArduinoBLE.h>
 #include <MotorController.h>
 
-#define MOTOR_PIN 10
-#define PWM_FREQUENCY 31000
+// Define constants
+#define BLE_UUID "19B10000-E8F2-537E-4F6C-D104768A1214"
 
+const short MOTOR_PIN = 10;
+const unsigned short PWM_FREQUENCY = 31000;
+const short LED_PIN = LED_BUILTIN;
+
+// Initialize skateboard and blutooth objects
 MotorController skateboard(MOTOR_PIN);
+BLEService motorService(BLE_UUID);
+BLEUnsignedCharCharacteristic speedCharacteristic(BLE_UUID, BLERead | BLEWrite);
 
-BLEService motorService("19B10000-E8F2-537E-4F6C-D104768A1214");  // create service
-
-// create switch characteristic and allow remote device to read and write
-BLEUnsignedCharCharacteristic percentCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
-
-const int ledPin = LED_BUILTIN;  // pin to use for the LED
-
-// Function Prototypes
+// Define Function Prototypes
 void blePeripheralConnectHandler(BLEDevice central);
 void blePeripheralDisconnectHandler(BLEDevice central);
-void percentCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic);
+void speedCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic);
 
 void setup() {
+    // Initialize led and Serial for debugging and status updates.
     Serial.begin(9600);
-    while (!Serial)
-        ;
-
-    pinMode(ledPin, OUTPUT);  // use the LED pin as an output
+    pinMode(LED_PIN, OUTPUT);
 
     // Initialize skateboard
     skateboard.setFrequency(PWM_FREQUENCY);
@@ -33,33 +31,33 @@ void setup() {
     if (!BLE.begin()) {
         Serial.println("starting BLE failed!");
 
-        while (1)
-            ;
+        while (1) {
+            // Bluetooth failed to initialize. Enter endless loop. Blink Error Code.
+            digitalWrite(LED_PIN, HIGH);
+            delay(1000);
+            digitalWrite(LED_PIN, LOW);
+            delay(1000);
+        };
     }
 
     // set the local name peripheral advertises
     BLE.setLocalName("SkateBoard");
     // set the UUID for the service this peripheral advertises
     BLE.setAdvertisedService(motorService);
-
     // add the characteristic to the service
-    motorService.addCharacteristic(percentCharacteristic);
-
+    motorService.addCharacteristic(speedCharacteristic);
     // add service
     BLE.addService(motorService);
-
     // assign event handlers for connected, disconnected to peripheral
     BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
     BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
-
     // assign event handlers for characteristic
-    percentCharacteristic.setEventHandler(BLEWritten, percentCharacteristicWritten);
+    speedCharacteristic.setEventHandler(BLEWritten, speedCharacteristicWritten);
     // set an initial value for the characteristic
-    percentCharacteristic.setValue(0);
-
+    speedCharacteristic.setValue(0);
     // start advertising
     BLE.advertise();
-
+    // Print status message
     Serial.println(("Bluetooth device active, waiting for connections..."));
 }
 
@@ -68,39 +66,54 @@ void loop() {
     BLE.poll();
 }
 
+/**
+ * @brief Function to be called on ble conntection initialization
+ * 
+ * @param central - The connected device object instance
+ */
 void blePeripheralConnectHandler(BLEDevice central) {
     // central connected event handler
     Serial.print("Connected event, central: ");
     Serial.println(central.address());
 }
 
+/**
+ * @brief Function to be called on ble connection disconnected
+ * 
+ * @param central - The connected device object instance
+ */
 void blePeripheralDisconnectHandler(BLEDevice central) {
     // central disconnected event handler
     Serial.print("Disconnected event, central: ");
     Serial.println(central.address());
 }
 
-void percentCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
+/**
+ * @brief Function to be called when a new speed value is written
+ * 
+ * @param central - The connected device object instance
+ * @param characteristic - The characteristic object
+ */
+void speedCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
     // central wrote new value to characteristic, update skateboard speed
     Serial.print("Characteristic event, written: ");
 
-    short speed = percentCharacteristic.value();
+    // Ensure the skateboard speed percentage is between 0 and 100
+    short speed = speedCharacteristic.value();
     if (speed > 100) {
-        percentCharacteristic.setValue(100);
+        speedCharacteristic.setValue(100);
         speed = 100;
     } else if (speed < 0) {
-        percentCharacteristic.setValue(0);
+        speedCharacteristic.setValue(0);
         speed = 0;
     }
 
-    if (speed > 50) {
-        Serial.print("Speed Fast: ");
-        Serial.println(speed);
-        digitalWrite(ledPin, HIGH);
+    if (speed > 0) {
+        Serial.println("Skateboard on");
+        digitalWrite(LED_PIN, HIGH);
     } else {
-        Serial.print("Speed Slow: ");
-        Serial.println(speed);
-        digitalWrite(ledPin, LOW);
+        Serial.println("Skateboard off");
+        digitalWrite(LED_PIN, LOW);
     }
     skateboard.setSpeed(speed);
 }

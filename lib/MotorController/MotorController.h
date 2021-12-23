@@ -2,28 +2,35 @@
 #define MotorController_h
 
 #include <Arduino.h>
+#include <mbed.h>
 
-#include "mbed.h"
+using namespace mbed;
 
-// using namespace mbed;
+const short defaultRampSteps = 1;
+const short defaultRampDelay_ms = 5;
 
 class MotorController {
    public:
-    MotorController(unsigned short forwardPin);
-    // MotorController(unsigned short int forwardPin, unsigned short int reversePin);
-    // MotorController(unsigned short int forwardPin, unsigned short int reversePin, unsigned short int enablePin);
+    MotorController(unsigned short forwardPin);  // todo - add to programming if reverse not included
+    MotorController(unsigned short forwardPin, unsigned short reversePin);
+    MotorController(unsigned short forwardPin, unsigned short reversePin, unsigned short enablePin);  // todo - Add enablePin functionality
 
-    void setSpeed(unsigned short speedPercentage);
+    void setSpeed(short speedPercentage);
+    float getSpeed();
     // void setRampRate(float rampRatePerSec);
     void setFrequency(unsigned short pwmFrequency);
-    // void void enableRampRate();
-    // void disableRampRate();
+    void enableRampRate();
+    void disableRampRate();
 
    private:
-    mbed::PwmOut *forwardPin;
-    // mbed::PwmOut *reversePin;
-    // unsigned short int enablePin;
-    // bool rampRateEnabled;
+    PwmOut *forwardPin;
+    PwmOut *reversePin;
+    DigitalOut *enablePin;
+    bool rampRateEnabled;
+    short rampSteps;
+    short rampDelay;
+    unsigned long timeAtLastSet;
+    short currentSpeed;
 };
 
 #endif

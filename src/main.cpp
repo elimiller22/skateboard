@@ -4,14 +4,15 @@
 // Define constants
 #define BLE_UUID "19B10000-E8F2-537E-4F6C-D104768A1214"
 
-const short MOTOR_PIN = 10;
+const short FORWARD_MOTOR_PIN = 10;
+const short REVERSE_MOTOR_PIN = 8;
 const unsigned short PWM_FREQUENCY = 31000;
 const short LED_PIN = LED_BUILTIN;
 
 // Initialize skateboard and blutooth objects
-MotorController skateboard(MOTOR_PIN);
+MotorController skateboard(FORWARD_MOTOR_PIN, REVERSE_MOTOR_PIN);
 BLEService motorService(BLE_UUID);
-BLEUnsignedCharCharacteristic speedCharacteristic(BLE_UUID, BLERead | BLEWrite);
+BLEShortCharacteristic speedCharacteristic(BLE_UUID, BLERead | BLEWrite);
 
 // Define Function Prototypes
 void blePeripheralConnectHandler(BLEDevice central);
@@ -96,24 +97,37 @@ void blePeripheralDisconnectHandler(BLEDevice central) {
  */
 void speedCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
     // central wrote new value to characteristic, update skateboard speed
-    Serial.print("Characteristic event, written: ");
+    Serial.println("Characteristic event, written: ");
 
     // Ensure the skateboard speed percentage is between 0 and 100
     short speed = speedCharacteristic.value();
+    Serial.print("Char Value: ");
+    Serial.println(speed);
     if (speed > 100) {
+        Serial.println("Set Positive");
         speedCharacteristic.setValue(100);
         speed = 100;
-    } else if (speed < 0) {
-        speedCharacteristic.setValue(0);
-        speed = 0;
+    } else if (speed < -100) {
+        Serial.println("Set Negative");
+        speedCharacteristic.setValue(-100);
+        speed = -100;
     }
+    Serial.print("New Char Value: ");
+    Serial.println(speedCharacteristic.value());
 
-    if (speed > 0) {
+    if (speed != 0) {
         Serial.println("Skateboard on");
         digitalWrite(LED_PIN, HIGH);
     } else {
         Serial.println("Skateboard off");
         digitalWrite(LED_PIN, LOW);
     }
-    skateboard.setSpeed(speed);
+    int maxLoop = 10000;
+    int lastTime = millis();
+    int currentSpeed;
+    do {
+        skateboard.setSpeed(speed);
+        currentSpeed = skateboard.getSpeed();
+        lastTime = millis();
+    } while (currentSpeed != speed and (millis() - lastTime) <= maxLoop);
 }

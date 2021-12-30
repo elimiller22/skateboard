@@ -3,6 +3,8 @@
 
 // Define constants
 #define BLE_UUID "19B10000-E8F2-537E-4F6C-D104768A1214"
+#define SPEED_UUID "19B10000-E8F2-537E-4F6C-D104776A1219"
+#define DIR_UUID "19B10000-E8F2-537E-4F6C-D604168C1217"
 
 const short FORWARD_MOTOR_PIN = 10;
 const short REVERSE_MOTOR_PIN = 8;
@@ -12,16 +14,17 @@ const short LED_PIN = LED_BUILTIN;
 // Initialize skateboard and blutooth objects
 MotorController skateboard(FORWARD_MOTOR_PIN, REVERSE_MOTOR_PIN);
 BLEService motorService(BLE_UUID);
-BLEShortCharacteristic speedCharacteristic(BLE_UUID, BLERead | BLEWrite);
+BLEIntCharacteristic speedCharacteristic(SPEED_UUID, BLERead | BLEWrite);
+BLEBoolCharacteristic forwardDirectionCharacteristic(DIR_UUID, BLERead | BLEWrite);
 
 // Define Function Prototypes
-void blePeripheralConnectHandler(BLEDevice central);
-void blePeripheralDisconnectHandler(BLEDevice central);
-void speedCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic);
+void manageSkateboard(BLEDevice central);
+void debugBleSkateboardRemote(BLEDevice central);
 
 void setup() {
     // Initialize led and Serial for debugging and status updates.
     Serial.begin(9600);
+    // while (!Serial);
     pinMode(LED_PIN, OUTPUT);
 
     // Initialize skateboard
@@ -47,15 +50,13 @@ void setup() {
     BLE.setAdvertisedService(motorService);
     // add the characteristic to the service
     motorService.addCharacteristic(speedCharacteristic);
+    motorService.addCharacteristic(forwardDirectionCharacteristic);
     // add service
     BLE.addService(motorService);
-    // assign event handlers for connected, disconnected to peripheral
-    BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
-    BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
-    // assign event handlers for characteristic
-    speedCharacteristic.setEventHandler(BLEWritten, speedCharacteristicWritten);
+
     // set an initial value for the characteristic
     speedCharacteristic.setValue(0);
+    forwardDirectionCharacteristic.setValue(true);
     // start advertising
     BLE.advertise();
     // Print status message
@@ -63,71 +64,63 @@ void setup() {
 }
 
 void loop() {
-    // poll for BLE events
-    BLE.poll();
-}
+  // listen for BLE peripherals to connect:
+  BLEDevice central = BLE.central();
 
-/**
- * @brief Function to be called on ble conntection initialization
- * 
- * @param central - The connected device object instance
- */
-void blePeripheralConnectHandler(BLEDevice central) {
-    // central connected event handler
-    Serial.print("Connected event, central: ");
+  // if a central is connected to peripheral:
+  if (central) {
+    Serial.print("Connected to central: ");
+    // print the central's MAC address:
     Serial.println(central.address());
-}
+    
 
-/**
- * @brief Function to be called on ble connection disconnected
- * 
- * @param central - The connected device object instance
- */
-void blePeripheralDisconnectHandler(BLEDevice central) {
-    // central disconnected event handler
-    Serial.print("Disconnected event, central: ");
+    // while the central is still connected to peripheral:
+    manageSkateboard(central);
+    // debugBleSkateboardRemote(central);
+    
+    // when the central disconnects, print it out:
+    Serial.print(F("Disconnected from central: "));
     Serial.println(central.address());
+  }
 }
 
-/**
- * @brief Function to be called when a new speed value is written
- * 
- * @param central - The connected device object instance
- * @param characteristic - The characteristic object
- */
-void speedCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
-    // central wrote new value to characteristic, update skateboard speed
-    Serial.println("Characteristic event, written: ");
-
-    // Ensure the skateboard speed percentage is between 0 and 100
-    short speed = speedCharacteristic.value();
-    Serial.print("Char Value: ");
-    Serial.println(speed);
-    if (speed > 100) {
-        Serial.println("Set Positive");
-        speedCharacteristic.setValue(100);
-        speed = 100;
-    } else if (speed < -100) {
-        Serial.println("Set Negative");
-        speedCharacteristic.setValue(-100);
-        speed = -100;
-    }
-    Serial.print("New Char Value: ");
-    Serial.println(speedCharacteristic.value());
-
-    if (speed != 0) {
-        Serial.println("Skateboard on");
-        digitalWrite(LED_PIN, HIGH);
-    } else {
-        Serial.println("Skateboard off");
-        digitalWrite(LED_PIN, LOW);
-    }
-    int maxLoop = 10000;
-    int lastTime = millis();
-    int currentSpeed;
-    do {
-        skateboard.setSpeed(speed);
+void manageSkateboard(BLEDevice central) {
+    short desiredSpeed = 0;
+    short currentSpeed = 0;
+    bool forward = true;
+    while (central.connected()) {
+        if (speedCharacteristic.written() || forwardDirectionCharacteristic.written()) {
+            desiredSpeed = speedCharacteristic.value();
+            if (desiredSpeed > 100) {
+                speedCharacteristic.setValue(100);
+                desiredSpeed = 100;
+            }
+            forward = (bool)forwardDirectionCharacteristic.value();
+            if (!forward)
+                desiredSpeed *= -1;
+        }
         currentSpeed = skateboard.getSpeed();
-        lastTime = millis();
-    } while (currentSpeed != speed and (millis() - lastTime) <= maxLoop);
+        if (currentSpeed != desiredSpeed) {
+            skateboard.setSpeed(desiredSpeed);
+        }
+    }
+}
+
+void debugBleSkateboardRemote(BLEDevice central) {
+    int oldSpeed = 0;
+    int desiredSpeed = 0;
+    bool forward = true;
+    while (central.connected()) {
+        if (speedCharacteristic.written()) {
+            desiredSpeed = speedCharacteristic.value();
+            if (desiredSpeed > (oldSpeed + 2) || desiredSpeed < (oldSpeed - 2)) {
+                oldSpeed = desiredSpeed;
+                Serial.print("Returned Speed:");
+                Serial.println(desiredSpeed);
+                forward = (bool)forwardDirectionCharacteristic.value();
+                Serial.print("Current Forward Direction:");
+                Serial.println(forward);
+            }
+        }
+    }
 }

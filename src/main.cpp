@@ -21,7 +21,7 @@ BLEBoolCharacteristic forwardDirectionCharacteristic(DIR_UUID,
 
 // Define Function Prototypes
 void manageSkateboard(BLEDevice central);
-void debugBleSkateboardRemote(BLEDevice central);
+void stopSkateboard();
 
 /**
  * @brief Function to run setup on arduino.
@@ -86,12 +86,14 @@ void loop() {
 
     // while the central is still connected to peripheral:
     manageSkateboard(central);
-    // debugBleSkateboardRemote(central);
 
     // when the central disconnects, print it out:
     Serial.print(F("Disconnected from central: "));
     Serial.println(central.address());
   }
+  // If the skateboard isn't connected to a remote, ensure it is stopped.
+  // Needed to prevent a runaway condition.
+  stopSkateboard();
 }
 
 /**
@@ -127,5 +129,20 @@ void manageSkateboard(BLEDevice central) {
     if (currentSpeed != desiredSpeed) {
       skateboard.setSpeed(desiredSpeed);
     }
+  }
+}
+
+/**
+ * @brief Function to check if the skateboard is running, and if it is to set
+ * the speed to 0.
+ *
+ */
+void stopSkateboard() {
+  // Get the current speed of the skateboard
+  short currentSpeed = skateboard.getSpeed();
+  // If the current skateboard speed doesn't match the desired speed, set the
+  // speed.
+  if (currentSpeed != 0) {
+    skateboard.setSpeed(0);
   }
 }

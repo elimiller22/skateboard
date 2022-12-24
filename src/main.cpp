@@ -8,7 +8,7 @@
 
 const short FORWARD_MOTOR_PIN = 10;
 const short REVERSE_MOTOR_PIN = 8;
-const unsigned short PWM_FREQUENCY = 31000;
+const unsigned short PWM_FREQUENCY = 10000;
 const short LED_PIN = LED_BUILTIN;
 const short MIN_PWM_MOTOR_SPEED = 25;
 

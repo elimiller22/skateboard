@@ -6,11 +6,11 @@
 #define SPEED_UUID "19B10000-E8F2-537E-4F6C-D104776A1219"
 #define DIR_UUID "19B10000-E8F2-537E-4F6C-D604168C1217"
 
-const short FORWARD_MOTOR_PIN = 10;
-const short REVERSE_MOTOR_PIN = 8;
+const short FORWARD_MOTOR_PIN = 8;
+const short REVERSE_MOTOR_PIN = 10;
 const unsigned short PWM_FREQUENCY = 10000;
 const short LED_PIN = LED_BUILTIN;
-const short MIN_PWM_MOTOR_SPEED = 25;
+const short MIN_PWM_MOTOR_SPEED = 0;
 
 // Initialize skateboard and blutooth objects
 MotorController skateboard(FORWARD_MOTOR_PIN, REVERSE_MOTOR_PIN);
